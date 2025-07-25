@@ -332,7 +332,7 @@ function App() {
           <button
             style={{
               fontSize: 24,
-              padding: '16px 64px',
+              padding: '16px 34px',
               borderRadius: 32,
               background: 'linear-gradient(90deg, #1677ff 0%, #49c6fa 100%)',
               color: '#fff',
