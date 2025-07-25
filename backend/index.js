@@ -53,7 +53,7 @@ const debaterModelMap = {
     '张华': 'hy',
     '王强': 'deepseek',
     '刘芳': 'qwen',
-    '陈伟': 'glm',
+    '陈伟': 'deepseek',
     '赵敏': 'qwen',
     '孙浩': 'hy',
     '周丽': 'deepseek'
@@ -61,17 +61,44 @@ const debaterModelMap = {
 
 // 辩手发言API（按姓名分配模型）
 app.post('/api/debate/speak', async (req, res) => {
-    const { debater, stage } = req.body;
-    const prompt = `你是${debater}，现在是${stage}阶段，请发表你的观点。`;
+    let { debater, stage, side } = req.body;
+    // 如果是陈伟，强制为反方，并在prompt前加特殊要求
+    let chenweiPrefix = '';
+    if (debater.replace(/（.*?）/, '') === '陈伟') {
+        side = '反方';
+        chenweiPrefix = '你必须以“反方一辩陈伟”身份发言，禁止出现“正方”字样，必须全程以反方立场作答，否则视为无效。请严格遵守！';
+    }
+    const fullIdentity = side ? `${side}${debater}` : debater;
+    let prompt = '';
+    const topicPrefix = '辩题为“社交媒体是否利大于弊”。';
+    if (stage === '立论') {
+        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请阐述立场，定义核心概念，说明判断标准，提出3个论点并总结。每个论点需有真实数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
+    } else if (stage === '驳论') {
+        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请回应本方+反驳对方，补充论据，逻辑清晰。每条需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
+    } else if (stage === '质辩提问') {
+        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请提出1个具体问题，暴露对方漏洞，不能泛泛而谈。问题需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
+    } else if (stage === '质辩答复') {
+        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请针对性回答问题，引用真实数据，强化立场，不能回避。每条需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
+    } else if (stage === '质辩小结') {
+        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请总结我方优势和对方漏洞，为后续阶段铺垫。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
+    } else if (stage === '自由辩论') {
+        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请加强论点，攻击对方漏洞，提出引导性问题。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
+    } else if (stage === '总结陈词') {
+        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请回顾全场，升华立场，重申核心论点。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
+    } else {
+        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请结合本方立场，围绕当前阶段任务发言。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
+    }
     // 提取姓名（去除括号及内容）
     const name = debater.replace(/（.*?）/, '');
     const modelType = debaterModelMap[name] || 'glm';
 
+    const startTime = Date.now();
     logger.info({
         event: 'debater_speak_request',
         debater,
         stage,
         modelType,
+        prompt,
         timestamp: new Date().toISOString()
     });
 
@@ -87,12 +114,7 @@ app.post('/api/debate/speak', async (req, res) => {
                 top_p: 0.7,
                 temperature: 0.9
             });
-            try {
-                content = completion.choices[0].message.content;
-            } catch (error) {
-                console.error(`API调用失败 (${modelType}):`, error);
-                throw new Error(`模型响应解析失败: ${error.message}`);
-            }
+            content = completion.choices[0].message.content;
         } else if (modelType === 'qwen') {
             const completion = await qwen.chat.completions.create({
                 model: "qwen-plus",
@@ -101,12 +123,7 @@ app.post('/api/debate/speak', async (req, res) => {
                     { role: "user", content: prompt }
                 ]
             });
-            try {
-                content = completion.choices[0].message.content;
-            } catch (error) {
-                console.error(`API调用失败 (${modelType}):`, error);
-                throw new Error(`模型响应解析失败: ${error.message}`);
-            }
+            content = completion.choices[0].message.content;
         } else if (modelType === 'hy') {
             const completion = await hunyuan.chat.completions.create({
                 model: "hunyuan-turbos-latest",
@@ -116,12 +133,7 @@ app.post('/api/debate/speak', async (req, res) => {
                 ],
                 enable_enhancement: true
             });
-            try {
-                content = completion.choices[0].message.content;
-            } catch (error) {
-                console.error(`API调用失败 (${modelType}):`, error);
-                throw new Error(`模型响应解析失败: ${error.message}`);
-            }
+            content = completion.choices[0].message.content;
         } else if (modelType === 'deepseek') {
             const completion = await deepseek.chat.completions.create({
                 model: "deepseek-chat",
@@ -130,26 +142,27 @@ app.post('/api/debate/speak', async (req, res) => {
                     { role: "user", content: prompt }
                 ]
             });
-            try {
-                content = completion.choices[0].message.content;
-            } catch (error) {
-                console.error(`API调用失败 (${modelType}):`, error);
-                throw new Error(`模型响应解析失败: ${error.message}`);
-            }
+            content = completion.choices[0].message.content;
         }
+        const duration = Date.now() - startTime;
         logger.info({
             event: 'debater_speak_success',
             debater,
             modelType,
-            content: content.slice(0, 100),
+            stage,
+            duration_ms: duration,
+            content: content.slice(0, 200),
             timestamp: new Date().toISOString()
         });
         res.json({ content });
     } catch (e) {
+        const duration = Date.now() - startTime;
         logger.error({
             event: 'debater_speak_error',
             debater,
             modelType,
+            stage,
+            duration_ms: duration,
             error: e.message,
             timestamp: new Date().toISOString()
         });
