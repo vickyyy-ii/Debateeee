@@ -15,15 +15,48 @@ const avatarMap = {
 
 const DebaterPanel = ({ side, debaters, canSpeakIdx = [], visibleIdx = [0, 1, 2, 3], stage, stageIdx }) => {
     console.log(`[${side}] 当前渲染的辩手`, debaters);
+    console.log(`[${side}] visibleIdx:`, visibleIdx);
+    console.log(`[${side}] canSpeakIdx:`, canSpeakIdx);
+    console.log(`[${side}] 当前阶段:`, stage);
+
     return (
-        <div style={{ flex: 1, margin: '0 16px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, margin: '0 16px', minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
             <h3>{side}</h3>
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                {debaters.map((debater, idx) => (
-                    (visibleIdx.includes(idx) || canSpeakIdx.includes(idx)) && (
-                        <DebaterCard debater={debater} idx={idx} canSpeakIdx={canSpeakIdx} stage={stage} stageIdx={stageIdx} />
-                    )
-                ))}
+            <div style={{ flex: 1, minHeight: '300px', overflowY: 'auto' }}>
+                {debaters.map((debater, idx) => {
+                    // 自由辩论阶段显示所有辩手
+                    if (stage === '自由辩论') {
+                        console.log(`[${side}] 自由辩论阶段 - 显示辩手${idx}:`, debater.realName);
+                        return (
+                            <DebaterCard
+                                key={`${side}-${idx}-${debater.realName}`}
+                                debater={debater}
+                                idx={idx}
+                                canSpeakIdx={canSpeakIdx}
+                                stage={stage}
+                                stageIdx={stageIdx}
+                            />
+                        );
+                    }
+
+                    // 其他阶段按visibleIdx显示
+                    if (visibleIdx.includes(idx) || canSpeakIdx.includes(idx)) {
+                        console.log(`[${side}] 其他阶段 - 显示辩手${idx}:`, debater.realName);
+                        return (
+                            <DebaterCard
+                                key={`${side}-${idx}-${debater.realName}`}
+                                debater={debater}
+                                idx={idx}
+                                canSpeakIdx={canSpeakIdx}
+                                stage={stage}
+                                stageIdx={stageIdx}
+                            />
+                        );
+                    }
+
+                    console.log(`[${side}] 隐藏辩手${idx}:`, debater.realName);
+                    return null;
+                })}
             </div>
         </div>
     );
@@ -87,7 +120,9 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx }) => {
                 background: '#fafdff',
                 transition: 'box-shadow 0.3s, border 0.3s'
             }}
-            headStyle={{ background: '#f5f7fa', borderRadius: '12px 12px 0 0' }}
+            styles={{
+                header: { background: '#f5f7fa', borderRadius: '12px 12px 0 0' }
+            }}
         >
             <div>
                 {isDebateStage ? (

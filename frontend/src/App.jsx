@@ -108,6 +108,15 @@ function App() {
       }, timeout);
       const data = await res.json();
       console.log('【调试】handleDebaterSpeak fetch返回：', data);
+
+      // 验证 data.content 是否为有效字符串
+      if (!data || typeof data.content !== 'string') {
+        console.error('【错误】API返回的content无效:', data);
+        throw new Error('API返回的content无效');
+      }
+
+      console.log('【调试】data.content类型:', typeof data.content, '长度:', data.content.length);
+
       setDebaters(ds =>
         ds.map((d, i) =>
           i === idx
@@ -161,8 +170,18 @@ function App() {
       }, timeout);
       const data = await res.json();
       console.log('【调试】handleOpponentSpeak fetch返回：', data);
-      setOpponents(os =>
-        os.map((o, i) =>
+
+      // 验证 data.content 是否为有效字符串
+      if (!data || typeof data.content !== 'string') {
+        console.error('【错误】API返回的content无效:', data);
+        throw new Error('API返回的content无效');
+      }
+
+      console.log('【调试】data.content类型:', typeof data.content, '长度:', data.content.length);
+
+      console.log('【调试】更新前反方辩手状态:', opponents);
+      setOpponents(os => {
+        const newOpponents = os.map((o, i) =>
           i === idx
             ? {
               ...o,
@@ -176,8 +195,10 @@ function App() {
                   )
             }
             : o
-        )
-      );
+        );
+        console.log('【调试】更新后反方辩手状态:', newOpponents);
+        return newOpponents;
+      });
     } catch (e) {
       console.log('【调试】handleOpponentSpeak fetch异常：', e);
       setOpponents(os => os.map((o, i) => i === idx ? { ...o, history: [...o.history.slice(0, -1), '（大模型接口调用失败）'] } : o));
@@ -194,14 +215,22 @@ function App() {
 
   // 自动发言（当前阶段所有可发言选手，正反方完全并发）
   const autoSpeakForCurrentStage = async () => {
+    console.log('【调试】autoSpeakForCurrentStage 开始执行');
+    console.log('【调试】当前阶段:', stages[stageIdx]);
+    console.log('【调试】允许发言的辩手:', allowedDebaterIdx);
+    console.log('【调试】允许发言的反方:', allowedOpponentIdx);
+
     for (const idx of allowedDebaterIdx) {
+      console.log('【调试】开始调用正方辩手:', idx);
       await handleDebaterSpeak(idx);
       await delay(100);
     }
     for (const idx of allowedOpponentIdx) {
+      console.log('【调试】开始调用反方辩手:', idx);
       await handleOpponentSpeak(idx);
       await delay(100);
     }
+    console.log('【调试】autoSpeakForCurrentStage 执行完成');
   };
 
   // 自动推进流程
@@ -263,9 +292,38 @@ function App() {
 
     setStageIdx(prev => {
       const next = prev + 1;
-      return next < stages.length ? next : prev;
+      console.log('【调试】切换到下一阶段:', next, stages[next]);
+      const newStageIdx = next < stages.length ? next : prev;
+
+      // 在状态更新后立即调用API
+      setTimeout(() => {
+        console.log('【调试】开始调用下一阶段API，新阶段:', stages[newStageIdx]);
+        // 临时设置当前阶段索引，确保API调用使用正确的阶段
+        const tempStageIdx = newStageIdx;
+        const tempAllowedDebaterIdx = stageSpeakerMap[stages[tempStageIdx]]?.debaters || [];
+        const tempAllowedOpponentIdx = stageSpeakerMap[stages[tempStageIdx]]?.opponents || [];
+
+        console.log('【调试】临时阶段索引:', tempStageIdx);
+        console.log('【调试】临时允许发言辩手:', tempAllowedDebaterIdx);
+        console.log('【调试】临时允许发言反方:', tempAllowedOpponentIdx);
+
+        // 手动调用API
+        (async () => {
+          for (const idx of tempAllowedDebaterIdx) {
+            console.log('【调试】手动调用正方辩手:', idx);
+            await handleDebaterSpeak(idx);
+            await delay(100);
+          }
+          for (const idx of tempAllowedOpponentIdx) {
+            console.log('【调试】手动调用反方辩手:', idx);
+            await handleOpponentSpeak(idx);
+            await delay(100);
+          }
+        })();
+      }, 500);
+
+      return newStageIdx;
     });
-    setTimeout(autoSpeakForCurrentStage, 100);
   };
 
   // 重置所有状态
@@ -287,21 +345,32 @@ function App() {
   };
 
   // 显示当前阶段允许发言的辩手，保留他们的完整发言历史
-  const getCurrentTwoDebaters = (allDebaters, allowedIdx) =>
-    allDebaters.map((d, i) => {
+  const getCurrentTwoDebaters = (allDebaters, allowedIdx) => {
+    console.log('【调试】getCurrentTwoDebaters - 当前阶段:', stages[stageIdx]);
+    console.log('【调试】getCurrentTwoDebaters - allDebaters:', allDebaters);
+    console.log('【调试】getCurrentTwoDebaters - allowedIdx:', allowedIdx);
+
+    return allDebaters.map((d, i) => {
       // 在驳论环节，只显示二辩的发言
       if (stages[stageIdx] === '驳论') {
-        return i === 1 ? { ...d } : { ...d, history: [] }; // 只显示二辩（索引1）
+        const shouldShow = i === 1;
+        console.log(`【调试】驳论阶段 - 辩手${i}(${d.realName}) 显示:`, shouldShow);
+        return shouldShow ? { ...d } : { ...d, history: [] }; // 只显示二辩（索引1）
       }
       // 在质辩环节，只显示三辩的发言（质辩结论）
       if (stages[stageIdx] === '质辩') {
-        return i === 2 ? { ...d } : { ...d, history: [] }; // 只显示三辩（索引2）
+        const shouldShow = i === 2;
+        console.log(`【调试】质辩阶段 - 辩手${i}(${d.realName}) 显示:`, shouldShow);
+        return shouldShow ? { ...d } : { ...d, history: [] }; // 只显示三辩（索引2）
       }
       // 其他环节只显示当前阶段发言的辩手
-      return allowedIdx.includes(i)
+      const shouldShow = allowedIdx.includes(i);
+      console.log(`【调试】其他阶段 - 辩手${i}(${d.realName}) 显示:`, shouldShow);
+      return shouldShow
         ? { ...d } // 保留完整发言历史
         : { ...d, history: [] }; // 不显示其他辩手的发言
     });
+  };
 
   // 裁判自动打分：结辩阶段自动调用大模型接口获取分数
   const handleAutoJudge = async () => {
@@ -337,6 +406,13 @@ function App() {
     }
   }, [stageIdx, allowedDebaterIdx, debaters]);
 
+  // 新增：监听阶段变化，确保API调用正常执行
+  useEffect(() => {
+    console.log('【调试】阶段变化监听 - 当前阶段:', stages[stageIdx]);
+    console.log('【调试】阶段变化监听 - 允许发言辩手:', allowedDebaterIdx);
+    console.log('【调试】阶段变化监听 - 允许发言反方:', allowedOpponentIdx);
+  }, [stageIdx, allowedDebaterIdx, allowedOpponentIdx]);
+
   // 新增：评分后判断胜败并自动重置
   useEffect(() => {
     if (stageIdx === stages.length - 1 && scores.every(s => s !== '')) {
@@ -359,13 +435,35 @@ function App() {
   const handleStartDebate = () => {
     setIsStarted(true);
     setStageIdx(0);
+
+    // 在状态更新后立即调用API
     setTimeout(() => {
-      autoSpeakForCurrentStage();
-    }, 100);
+      console.log('【调试】开始调用立论阶段API');
+      // 立论阶段应该调用索引0的辩手（一辩）
+      const tempAllowedDebaterIdx = [0]; // 正方一辩
+      const tempAllowedOpponentIdx = [0]; // 反方一辩
+
+      console.log('【调试】立论阶段 - 允许发言辩手:', tempAllowedDebaterIdx);
+      console.log('【调试】立论阶段 - 允许发言反方:', tempAllowedOpponentIdx);
+
+      // 手动调用API
+      (async () => {
+        for (const idx of tempAllowedDebaterIdx) {
+          console.log('【调试】手动调用正方一辩:', idx);
+          await handleDebaterSpeak(idx);
+          await delay(100);
+        }
+        for (const idx of tempAllowedOpponentIdx) {
+          console.log('【调试】手动调用反方一辩:', idx);
+          await handleOpponentSpeak(idx);
+          await delay(100);
+        }
+      })();
+    }, 500);
   };
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, minHeight: '100vh' }}>
       {!isStarted ? (
         <div style={{ textAlign: 'center', marginTop: 100 }}>
           <button
@@ -417,40 +515,58 @@ function App() {
               {stageTipText}
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <DebaterPanel
-              side="正方"
-              debaters={getCurrentTwoDebaters(debaters, allowedDebaterIdx)}
-              canSpeakIdx={allowedDebaterIdx}
-              visibleIdx={
-                stages[stageIdx] === '驳论' ? [1] :
-                  stages[stageIdx] === '质辩' ? [2] :
-                    allowedDebaterIdx
-              }
+          <div style={{ display: 'flex', justifyContent: 'space-between', minHeight: '400px' }}>
+            {(() => {
+              console.log('【调试】正方DebaterPanel - 当前阶段:', stages[stageIdx]);
+              console.log('【调试】正方DebaterPanel - allowedDebaterIdx:', allowedDebaterIdx);
+              console.log('【调试】正方DebaterPanel - visibleIdx:', stages[stageIdx] === '驳论' ? [1] : stages[stageIdx] === '质辩' ? [2] : allowedDebaterIdx);
+              return (
+                <DebaterPanel
+                  side="正方"
+                  debaters={getCurrentTwoDebaters(debaters, allowedDebaterIdx)}
+                  canSpeakIdx={allowedDebaterIdx}
+                  visibleIdx={
+                    stages[stageIdx] === '驳论' ? [1] :
+                      stages[stageIdx] === '质辩' ? [2] :
+                        allowedDebaterIdx
+                  }
+                  stage={stages[stageIdx]}
+                  stageIdx={stageIdx}
+                />
+              );
+            })()}
+            {(() => {
+              const processedOpponents = getCurrentTwoDebaters(opponents, allowedOpponentIdx);
+              console.log('【调试】反方DebaterPanel - 当前阶段:', stages[stageIdx]);
+              console.log('【调试】反方DebaterPanel - processedOpponents:', processedOpponents);
+              console.log('【调试】反方DebaterPanel - allowedOpponentIdx:', allowedOpponentIdx);
+              console.log('【调试】反方DebaterPanel - visibleIdx:', stages[stageIdx] === '驳论' ? [1] : stages[stageIdx] === '质辩' ? [2] : allowedOpponentIdx);
+              return (
+                <DebaterPanel
+                  side="反方"
+                  debaters={processedOpponents}
+                  canSpeakIdx={allowedOpponentIdx}
+                  visibleIdx={
+                    stages[stageIdx] === '驳论' ? [1] :
+                      stages[stageIdx] === '质辩' ? [2] :
+                        allowedOpponentIdx
+                  }
+                  stage={stages[stageIdx]}
+                  stageIdx={stageIdx}
+                />
+              );
+            })()}
+          </div>
+          <div style={{ marginTop: '24px', padding: '16px', background: '#f5f7fa', borderRadius: '8px' }}>
+            <ControlPanel
+              onNextStage={handleNextStage}
+              onReset={handleReset}
+              onAutoSpeak={autoSpeakForCurrentStage}
+              disabled={isAutoRunning || stageIdx >= stages.length - 1}
+              isAutoRunning={isAutoRunning}
               stage={stages[stageIdx]}
-              stageIdx={stageIdx}
-            />
-            <DebaterPanel
-              side="反方"
-              debaters={getCurrentTwoDebaters(opponents, allowedOpponentIdx)}
-              canSpeakIdx={allowedOpponentIdx}
-              visibleIdx={
-                stages[stageIdx] === '驳论' ? [1] :
-                  stages[stageIdx] === '质辩' ? [2] :
-                    allowedOpponentIdx
-              }
-              stage={stages[stageIdx]}
-              stageIdx={stageIdx}
             />
           </div>
-          <ControlPanel
-            onNextStage={handleNextStage}
-            onReset={handleReset}
-            onAutoSpeak={autoSpeakForCurrentStage}
-            disabled={isAutoRunning || stageIdx >= stages.length - 1}
-            isAutoRunning={isAutoRunning}
-            stage={stages[stageIdx]}
-          />
           {/* 只在最后一个阶段显示评分区 */}
           {stageIdx === stages.length - 1 && (
             <>

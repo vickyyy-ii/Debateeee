@@ -84,7 +84,7 @@ app.post('/api/debate/speak', async (req, res) => {
         prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请总结我方优势和对方漏洞，为后续阶段铺垫。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
     } else if (stage === '自由辩论') {
         prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请加强论点，攻击对方漏洞，提出引导性问题。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
-    } else if (stage === '总结陈词') {
+    } else if (stage === '结辩') {
         prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请回顾全场，升华立场，重申核心论点。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
     } else {
         prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请结合本方立场，围绕当前阶段任务发言。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
