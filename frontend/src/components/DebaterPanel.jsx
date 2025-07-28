@@ -13,11 +13,14 @@ const avatarMap = {
     '周丽': '👩‍🔬',
 };
 
-const DebaterPanel = ({ side, debaters, canSpeakIdx = [], visibleIdx = [0, 1, 2, 3], stage, stageIdx, isReset = false }) => {
+const DebaterPanel = ({ side, debaters, canSpeakIdx = [], visibleIdx = [0, 1, 2, 3], stage, stageIdx, isReset = false, addToReadingQueue, isReading }) => {
     console.log(`[${side}] 当前渲染的辩手`, debaters);
     console.log(`[${side}] visibleIdx:`, visibleIdx);
     console.log(`[${side}] canSpeakIdx:`, canSpeakIdx);
     console.log(`[${side}] 当前阶段:`, stage);
+
+    // 自动朗读设置
+    const [autoRead, setAutoRead] = useState(true);
 
     // 监听阶段变化，暂停朗读
     useEffect(() => {
@@ -28,14 +31,16 @@ const DebaterPanel = ({ side, debaters, canSpeakIdx = [], visibleIdx = [0, 1, 2,
     }, [stage, stageIdx, side, isReset]);
 
     // 语音朗读功能
-    const speakText = (text, speakerName) => {
-        console.log('speakText被调用:', { text, speakerName });
+    const speakText = (text, speakerName, cancelPrevious = true) => {
+        console.log('speakText被调用:', { text, speakerName, cancelPrevious });
         console.log('speechSynthesis是否可用:', 'speechSynthesis' in window);
 
         if ('speechSynthesis' in window) {
             console.log('开始语音朗读流程');
-            // 停止当前正在播放的语音
-            window.speechSynthesis.cancel();
+            // 停止当前正在播放的语音（仅在需要时）
+            if (cancelPrevious) {
+                window.speechSynthesis.cancel();
+            }
 
             // 清理文本，只移除特定的特殊符号，保留中文标点
             const cleanText = text
@@ -153,7 +158,18 @@ const DebaterPanel = ({ side, debaters, canSpeakIdx = [], visibleIdx = [0, 1, 2,
 
     return (
         <div style={{ flex: 1, margin: '0 16px', minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-            <h3>{side}</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3>{side}</h3>
+                <label style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                        type="checkbox"
+                        checked={autoRead}
+                        onChange={(e) => setAutoRead(e.target.checked)}
+                        style={{ margin: 0 }}
+                    />
+                    自动朗读
+                </label>
+            </div>
             <div style={{ flex: 1, minHeight: '300px', overflowY: 'auto' }}>
                 {debaters.map((debater, idx) => {
                     // 自由辩论阶段显示所有辩手
@@ -168,7 +184,9 @@ const DebaterPanel = ({ side, debaters, canSpeakIdx = [], visibleIdx = [0, 1, 2,
                                 stage={stage}
                                 stageIdx={stageIdx}
                                 isReset={isReset}
-                                speakText={speakText}
+                                autoRead={autoRead}
+                                addToReadingQueue={addToReadingQueue}
+                                side={side}
                             />
                         );
                     }
@@ -185,7 +203,9 @@ const DebaterPanel = ({ side, debaters, canSpeakIdx = [], visibleIdx = [0, 1, 2,
                                 stage={stage}
                                 stageIdx={stageIdx}
                                 isReset={isReset}
-                                speakText={speakText}
+                                autoRead={autoRead}
+                                addToReadingQueue={addToReadingQueue}
+                                side={side}
                             />
                         );
                     }
@@ -211,7 +231,7 @@ const TypingDots = () => {
 };
 
 // 单独拆出卡片，支持展开/收起
-const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx, isReset = false, speakText }) => {
+const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx, isReset = false, autoRead = true, addToReadingQueue, side }) => {
     const latestContent = debater.history && debater.history.length > 0 ? debater.history[debater.history.length - 1] : '';
     const isError = latestContent === '（大模型接口调用失败）';
     const isEmpty = !latestContent;
@@ -371,14 +391,20 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx, isReset = fal
                                     <TypewriterText
                                         key={`${debater.realName}-${debater.history.length}`}
                                         style={{ fontWeight: 'bold' }}
-                                        onTypingComplete={() => setIsTextComplete(true)}
+                                        speakerName={debater.realName}
+                                        autoRead={autoRead}
+                                        addToReadingQueue={addToReadingQueue}
+                                        side={side}
+                                        onTypingComplete={() => {
+                                            setIsTextComplete(true);
+                                        }}
                                     >
                                         {argument}
                                     </TypewriterText>
                                     {latestContent && isTextComplete && (
                                         <button
                                             onClick={() => {
-                                                speakText(argument, debater.realName);
+                                                addToReadingQueue(argument, debater.realName, side);
                                             }}
                                             style={{
                                                 marginTop: '8px',
@@ -409,10 +435,11 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx, isReset = fal
 };
 
 // 逐字显示动画组件
-const TypewriterText = ({ children, style, onClick, onTypingComplete }) => {
+const TypewriterText = ({ children, style, onClick, onTypingComplete, speakerName, autoRead = true, addToReadingQueue, side }) => {
     const [displayText, setDisplayText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const intervalRef = useRef(null);
+    const lastSpokenText = useRef('');
 
     useEffect(() => {
         // 清除之前的定时器
@@ -456,7 +483,18 @@ const TypewriterText = ({ children, style, onClick, onTypingComplete }) => {
         // 开始打字机效果
         intervalRef.current = setInterval(() => {
             if (currentIndex < text.length) {
-                setDisplayText(text.substring(0, currentIndex + 1));
+                const newText = text.substring(0, currentIndex + 1);
+                setDisplayText(newText);
+
+                // 实时朗读功能 - 只在文本完成时添加到队列
+                if (autoRead && addToReadingQueue && speakerName && side && currentIndex === text.length - 1) {
+                    console.log('文本完成，添加到朗读队列:', newText);
+                    setTimeout(() => {
+                        addToReadingQueue(newText, speakerName, side);
+                    }, 0);
+                    lastSpokenText.current = newText;
+                }
+
                 currentIndex++;
             } else {
                 setIsTyping(false);

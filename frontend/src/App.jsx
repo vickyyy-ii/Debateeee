@@ -74,8 +74,90 @@ function App() {
   const [speakingDebaters, setSpeakingDebaters] = useState(new Set());
   const [speakingOpponents, setSpeakingOpponents] = useState(new Set());
 
+  // 朗读队列管理
+  const [readingQueue, setReadingQueue] = useState([]);
+  const [isReading, setIsReading] = useState(false);
+
   // 添加调试信息
   console.log('应用状态:', { isStarted, stageIdx, stages: stages[stageIdx] });
+
+  // 全局朗读管理函数
+  const addToReadingQueue = (text, speakerName, side) => {
+    const newItem = { text, speakerName, side, id: Date.now() };
+    setReadingQueue(prev => [...prev, newItem]);
+    console.log(`添加朗读队列: ${side} ${speakerName}`, text);
+  };
+
+  const processReadingQueue = async () => {
+    if (isReading || readingQueue.length === 0) return;
+
+    setIsReading(true);
+    const item = readingQueue[0];
+    console.log(`开始朗读: ${item.side} ${item.speakerName}`, item.text);
+
+    // 创建语音合成对象
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(item.text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 0.85;
+      utterance.pitch = 1.1;
+      utterance.volume = 0.9;
+
+      // 等待语音列表加载
+      const speakWithVoice = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const chineseVoices = voices.filter(voice =>
+          voice.lang.includes('zh') || voice.lang.includes('cmn')
+        );
+
+        if (chineseVoices.length > 0) {
+          const voiceIndex = Math.abs(item.speakerName.length) % chineseVoices.length;
+          utterance.voice = chineseVoices[voiceIndex];
+        }
+
+        window.speechSynthesis.speak(utterance);
+      };
+
+      // 设置完成回调
+      utterance.onend = () => {
+        console.log(`朗读完成: ${item.side} ${item.speakerName}`);
+        setReadingQueue(prev => {
+          const newQueue = prev.slice(1);
+          // 继续处理队列中的下一个
+          if (newQueue.length > 0) {
+            setTimeout(processReadingQueue, 500);
+          }
+          return newQueue;
+        });
+        setIsReading(false);
+      };
+
+      utterance.onerror = (event) => {
+        console.error('朗读错误:', event);
+        setReadingQueue(prev => prev.slice(1));
+        setIsReading(false);
+      };
+
+      // 开始朗读
+      if (window.speechSynthesis.getVoices().length > 0) {
+        speakWithVoice();
+      } else {
+        window.speechSynthesis.onvoiceschanged = speakWithVoice;
+      }
+    } else {
+      // 如果浏览器不支持语音合成，使用延迟模拟
+      await delay(3000);
+      setReadingQueue(prev => prev.slice(1));
+      setIsReading(false);
+    }
+  };
+
+  // 监听队列变化，自动处理
+  useEffect(() => {
+    if (readingQueue.length > 0 && !isReading) {
+      processReadingQueue();
+    }
+  }, [readingQueue, isReading]);
 
   // 当前阶段允许发言的索引
   const allowedDebaterIdx = stageSpeakerMap[stages[stageIdx]]?.debaters || [];
@@ -650,6 +732,8 @@ function App() {
                   stage={stages[stageIdx]}
                   stageIdx={stageIdx}
                   isReset={isReset}
+                  addToReadingQueue={addToReadingQueue}
+                  isReading={isReading}
                 />
               );
             })()}
@@ -672,6 +756,8 @@ function App() {
                   stage={stages[stageIdx]}
                   stageIdx={stageIdx}
                   isReset={isReset}
+                  addToReadingQueue={addToReadingQueue}
+                  isReading={isReading}
                 />
               );
             })()}
