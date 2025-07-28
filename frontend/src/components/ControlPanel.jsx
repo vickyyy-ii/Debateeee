@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ControlPanel = ({ onNextStage, onReset, onAutoSpeak, disabled, isAutoRunning, stage }) => {
+const ControlPanel = ({ onNextStage, onReset, onAutoSpeak, disabled, isAutoRunning, stage, isReset }) => {
     return (
         <div style={{ margin: '24px 0', textAlign: 'center' }}>
             {/* 只显示"下一阶段"按钮，结辩阶段隐藏 */}
@@ -41,8 +41,8 @@ const ControlPanel = ({ onNextStage, onReset, onAutoSpeak, disabled, isAutoRunni
                     重置
                 </button>
             )}
-            {/* 调试按钮 - 手动触发当前阶段发言 */}
-            {stage === '驳论' && (
+            {/* 手动触发当前阶段发言按钮 - 在重置后或需要时显示 */}
+            {(isReset || stage === '驳论') && (
                 <button
                     onClick={onAutoSpeak}
                     style={{

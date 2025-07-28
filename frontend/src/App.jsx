@@ -55,8 +55,8 @@ const fetchWithTimeout = (url, options, timeout = 30000) => {
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function App() {
-  // 初始化直接进入“立论”阶段
-  const [stageIdx, setStageIdx] = useState(0); // 0 表示“立论”
+  // 初始化直接进入"立论"阶段
+  const [stageIdx, setStageIdx] = useState(0); // 0 表示"立论"
   const [debaters, setDebaters] = useState(initialDebaters);
   const [opponents, setOpponents] = useState(initialOpponents);
   const [scores, setScores] = useState(Array(8).fill(''));
@@ -68,6 +68,14 @@ function App() {
   const autoTimer = useRef(null);
   const autoIdxRef = useRef(1);
   const [isStarted, setIsStarted] = useState(false);
+  const [isReset, setIsReset] = useState(false); // 新增：跟踪是否是重置后的重新开始
+
+  // 防重复调用状态
+  const [speakingDebaters, setSpeakingDebaters] = useState(new Set());
+  const [speakingOpponents, setSpeakingOpponents] = useState(new Set());
+
+  // 添加调试信息
+  console.log('应用状态:', { isStarted, stageIdx, stages: stages[stageIdx] });
 
   // 当前阶段允许发言的索引
   const allowedDebaterIdx = stageSpeakerMap[stages[stageIdx]]?.debaters || [];
@@ -78,10 +86,39 @@ function App() {
 
   // 单个辩手发言（调用后端API）
   const handleDebaterSpeak = async idx => {
+    // 防重复调用检查
+    if (speakingDebaters.has(idx)) {
+      console.log('【调试】辩手', idx, '正在发言中，跳过重复调用');
+      return;
+    }
+
     const debater = debaters[idx].realName; // 传递真实姓名
     const stage = stages[stageIdx];
-    let content = '（正在调用大模型...）';
-    setDebaters(ds => ds.map((d, i) => i === idx ? { ...d, history: [...d.history, content] } : d));
+
+    // 检查是否已有有效发言内容，如果有则跳过
+    const currentDebater = debaters[idx];
+    const hasValidContent = currentDebater.history && currentDebater.history.length > 0 &&
+      currentDebater.history[currentDebater.history.length - 1] !== '（正在调用大模型...）' &&
+      currentDebater.history[currentDebater.history.length - 1] !== '（大模型接口调用失败）';
+
+    if (hasValidContent) {
+      console.log('【调试】辩手', idx, '已有有效发言内容，跳过重复生成');
+      return;
+    }
+
+    // 检查是否已有发言内容，如果有则不重新设置"正在调用大模型..."
+    const hasContent = currentDebater.history && currentDebater.history.length > 0 &&
+      currentDebater.history[currentDebater.history.length - 1] !== '（正在调用大模型...）';
+
+    if (!hasContent) {
+      let content = '（正在调用大模型...）';
+      // 标记为正在发言
+      setSpeakingDebaters(prev => new Set([...prev, idx]));
+      setDebaters(ds => ds.map((d, i) => i === idx ? { ...d, history: [...d.history, content] } : d));
+    } else {
+      // 如果已有内容，只标记为正在发言，不重新设置提示文本
+      setSpeakingDebaters(prev => new Set([...prev, idx]));
+    }
 
     // 获取一辩的发言内容用于驳论（现在驳论环节只显示二辩，不需要获取一辩内容）
     let opponentFirstSpeech = '';
@@ -117,19 +154,13 @@ function App() {
 
       console.log('【调试】data.content类型:', typeof data.content, '长度:', data.content.length);
 
+      // 只有在没有内容或内容为"正在调用大模型..."时才更新
       setDebaters(ds =>
         ds.map((d, i) =>
           i === idx
             ? {
               ...d,
-              history:
-                d.history.length === 0
-                  ? [data.content]
-                  : d.history.map((h, j) =>
-                    j === d.history.length - 1 && h === '（正在调用大模型...）'
-                      ? data.content
-                      : h
-                  )
+              history: d.history.filter(h => h !== '（正在调用大模型...）').concat([data.content])
             }
             : d
         )
@@ -137,13 +168,49 @@ function App() {
     } catch (e) {
       console.log('【调试】handleDebaterSpeak fetch异常：', e);
       setDebaters(ds => ds.map((d, i) => i === idx ? { ...d, history: [...d.history.slice(0, -1), '（大模型接口调用失败）'] } : d));
+    } finally {
+      // 移除发言状态
+      setSpeakingDebaters(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(idx);
+        return newSet;
+      });
     }
   };
   const handleOpponentSpeak = async idx => {
+    // 防重复调用检查
+    if (speakingOpponents.has(idx)) {
+      console.log('【调试】反方辩手', idx, '正在发言中，跳过重复调用');
+      return;
+    }
+
     const debater = opponents[idx].realName; // 传递真实姓名
     const stage = stages[stageIdx];
-    let content = '（正在调用大模型...）';
-    setOpponents(os => os.map((o, i) => i === idx ? { ...o, history: [...o.history, content] } : o));
+
+    // 检查是否已有有效发言内容，如果有则跳过
+    const currentOpponent = opponents[idx];
+    const hasValidContent = currentOpponent.history && currentOpponent.history.length > 0 &&
+      currentOpponent.history[currentOpponent.history.length - 1] !== '（正在调用大模型...）' &&
+      currentOpponent.history[currentOpponent.history.length - 1] !== '（大模型接口调用失败）';
+
+    if (hasValidContent) {
+      console.log('【调试】反方辩手', idx, '已有有效发言内容，跳过重复生成');
+      return;
+    }
+
+    // 检查是否已有发言内容，如果有则不重新设置"正在调用大模型..."
+    const hasContent = currentOpponent.history && currentOpponent.history.length > 0 &&
+      currentOpponent.history[currentOpponent.history.length - 1] !== '（正在调用大模型...）';
+
+    if (!hasContent) {
+      let content = '（正在调用大模型...）';
+      // 标记为正在发言
+      setSpeakingOpponents(prev => new Set([...prev, idx]));
+      setOpponents(os => os.map((o, i) => i === idx ? { ...o, history: [...o.history, content] } : o));
+    } else {
+      // 如果已有内容，只标记为正在发言，不重新设置提示文本
+      setSpeakingOpponents(prev => new Set([...prev, idx]));
+    }
 
     // 获取一辩的发言内容用于驳论（现在驳论环节只显示二辩，不需要获取一辩内容）
     let opponentFirstSpeech = '';
@@ -179,20 +246,14 @@ function App() {
 
       console.log('【调试】data.content类型:', typeof data.content, '长度:', data.content.length);
 
+      // 只有在没有内容或内容为"正在调用大模型..."时才更新
       console.log('【调试】更新前反方辩手状态:', opponents);
       setOpponents(os => {
         const newOpponents = os.map((o, i) =>
           i === idx
             ? {
               ...o,
-              history:
-                o.history.length === 0
-                  ? [data.content]
-                  : o.history.map((h, j) =>
-                    j === o.history.length - 1 && h === '（正在调用大模型...）'
-                      ? data.content
-                      : h
-                  )
+              history: o.history.filter(h => h !== '（正在调用大模型...）').concat([data.content])
             }
             : o
         );
@@ -202,6 +263,13 @@ function App() {
     } catch (e) {
       console.log('【调试】handleOpponentSpeak fetch异常：', e);
       setOpponents(os => os.map((o, i) => i === idx ? { ...o, history: [...o.history.slice(0, -1), '（大模型接口调用失败）'] } : o));
+    } finally {
+      // 移除发言状态
+      setSpeakingOpponents(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(idx);
+        return newSet;
+      });
     }
   };
 
@@ -219,6 +287,11 @@ function App() {
     console.log('【调试】当前阶段:', stages[stageIdx]);
     console.log('【调试】允许发言的辩手:', allowedDebaterIdx);
     console.log('【调试】允许发言的反方:', allowedOpponentIdx);
+
+    // 如果是重置状态，清除重置标志
+    if (isReset) {
+      setIsReset(false);
+    }
 
     for (const idx of allowedDebaterIdx) {
       console.log('【调试】开始调用正方辩手:', idx);
@@ -239,19 +312,20 @@ function App() {
     // 移除暂停和继续相关函数
     // const handlePause = () => { ... }
     // const handleContinue = () => { ... }
-    autoIdxRef.current = idx;
+    autoIdxRef.current = startIdx;
 
     // 确保当前阶段已设置
-    if (stageIdx !== idx) {
-      setStageIdx(idx);
+    if (stageIdx !== startIdx) {
+      setStageIdx(startIdx);
       // 给状态更新足够的时间
       await new Promise(r => setTimeout(r, 500));
     }
 
-    while (idx < stages.length) {
+    let currentIdx = startIdx;
+    while (currentIdx < stages.length) {
       // 设置当前阶段
-      setStageIdx(idx);
-      autoIdxRef.current = idx;
+      setStageIdx(currentIdx);
+      autoIdxRef.current = currentIdx;
 
       // 使用 requestAnimationFrame 确保 DOM 更新
       await new Promise(resolve => {
@@ -264,15 +338,15 @@ function App() {
       // 执行当前阶段的自动发言
       await autoSpeakForCurrentStage();
 
-      if (!isAutoRunning || idx === stages.length - 1) break;
+      if (!isAutoRunning || currentIdx === stages.length - 1) break;
 
       // 在进入下一阶段前等待
       await new Promise(r => {
         autoTimer.current = setTimeout(r, 1500);
       });
 
-      idx++;
-      autoIdxRef.current = idx;
+      currentIdx++;
+      autoIdxRef.current = currentIdx;
     }
     setIsAutoRunning(false);
   };
@@ -286,6 +360,12 @@ function App() {
     setIsAutoRunning(false);
     if (autoTimer.current) clearTimeout(autoTimer.current);
 
+    // 暂停所有朗读
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      console.log('阶段切换，已暂停所有朗读');
+    }
+
     // 不清空发言历史，让后续环节能看到前面的发言内容
     // setDebaters(ds => ds.map(d => ({ ...d, history: [] })));
     // setOpponents(os => os.map(o => ({ ...o, history: [] })));
@@ -295,32 +375,47 @@ function App() {
       console.log('【调试】切换到下一阶段:', next, stages[next]);
       const newStageIdx = next < stages.length ? next : prev;
 
-      // 在状态更新后立即调用API
-      setTimeout(() => {
-        console.log('【调试】开始调用下一阶段API，新阶段:', stages[newStageIdx]);
-        // 临时设置当前阶段索引，确保API调用使用正确的阶段
-        const tempStageIdx = newStageIdx;
-        const tempAllowedDebaterIdx = stageSpeakerMap[stages[tempStageIdx]]?.debaters || [];
-        const tempAllowedOpponentIdx = stageSpeakerMap[stages[tempStageIdx]]?.opponents || [];
+      // 如果进入自由辩论阶段，清空所有辩手的发言历史
+      if (stages[newStageIdx] === '自由辩论') {
+        console.log('【调试】进入自由辩论阶段，清空所有辩手发言历史');
+        setDebaters(ds => ds.map(d => ({ ...d, history: [] })));
+        setOpponents(os => os.map(o => ({ ...o, history: [] })));
+        // 确保自由辩论阶段能正常调用API
+        console.log('【调试】自由辩论阶段 - 允许发言辩手:', stageSpeakerMap[stages[newStageIdx]]?.debaters);
+        console.log('【调试】自由辩论阶段 - 允许发言反方:', stageSpeakerMap[stages[newStageIdx]]?.opponents);
+      }
 
-        console.log('【调试】临时阶段索引:', tempStageIdx);
-        console.log('【调试】临时允许发言辩手:', tempAllowedDebaterIdx);
-        console.log('【调试】临时允许发言反方:', tempAllowedOpponentIdx);
+      // 只有在非重置状态下才自动调用API
+      if (!isReset) {
+        // 在状态更新后立即调用API
+        setTimeout(() => {
+          console.log('【调试】开始调用下一阶段API，新阶段:', stages[newStageIdx]);
+          // 临时设置当前阶段索引，确保API调用使用正确的阶段
+          const tempStageIdx = newStageIdx;
+          const tempAllowedDebaterIdx = stageSpeakerMap[stages[tempStageIdx]]?.debaters || [];
+          const tempAllowedOpponentIdx = stageSpeakerMap[stages[tempStageIdx]]?.opponents || [];
 
-        // 手动调用API
-        (async () => {
-          for (const idx of tempAllowedDebaterIdx) {
-            console.log('【调试】手动调用正方辩手:', idx);
-            await handleDebaterSpeak(idx);
-            await delay(100);
-          }
-          for (const idx of tempAllowedOpponentIdx) {
-            console.log('【调试】手动调用反方辩手:', idx);
-            await handleOpponentSpeak(idx);
-            await delay(100);
-          }
-        })();
-      }, 500);
+          console.log('【调试】临时阶段索引:', tempStageIdx);
+          console.log('【调试】临时允许发言辩手:', tempAllowedDebaterIdx);
+          console.log('【调试】临时允许发言反方:', tempAllowedOpponentIdx);
+
+          // 手动调用API
+          (async () => {
+            console.log('【调试】开始调用自由辩论阶段API，辩手数量:', tempAllowedDebaterIdx.length + tempAllowedOpponentIdx.length);
+            for (const idx of tempAllowedDebaterIdx) {
+              console.log('【调试】手动调用正方辩手:', idx);
+              await handleDebaterSpeak(idx);
+              await delay(100);
+            }
+            for (const idx of tempAllowedOpponentIdx) {
+              console.log('【调试】手动调用反方辩手:', idx);
+              await handleOpponentSpeak(idx);
+              await delay(100);
+            }
+            console.log('【调试】自由辩论阶段API调用完成');
+          })();
+        }, 500);
+      }
 
       return newStageIdx;
     });
@@ -331,11 +426,22 @@ function App() {
     setIsStarted(false); // 回到初始页
     setIsAutoRunning(false);
     if (autoTimer.current) clearTimeout(autoTimer.current);
+
+    // 暂停所有朗读
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      console.log('重置辩论，已暂停所有朗读');
+    }
+
     setStageIdx(0);
     setDebaters(initialDebaters);
     setOpponents(initialOpponents);
     setScores(Array(8).fill(''));
     autoIdxRef.current = 1;
+    // 清空发言状态
+    setSpeakingDebaters(new Set());
+    setSpeakingOpponents(new Set());
+    setIsReset(true); // 设置重置标志
   };
 
   const handleScoreChange = (idx, value) => {
@@ -362,6 +468,11 @@ function App() {
         const shouldShow = i === 2;
         console.log(`【调试】质辩阶段 - 辩手${i}(${d.realName}) 显示:`, shouldShow);
         return shouldShow ? { ...d } : { ...d, history: [] }; // 只显示三辩（索引2）
+      }
+      // 在自由辩论环节，显示所有辩手的发言
+      if (stages[stageIdx] === '自由辩论') {
+        console.log(`【调试】自由辩论阶段 - 辩手${i}(${d.realName}) 显示发言`);
+        return { ...d }; // 显示所有辩手的发言历史
       }
       // 其他环节只显示当前阶段发言的辩手
       const shouldShow = allowedIdx.includes(i);
@@ -436,30 +547,36 @@ function App() {
     setIsStarted(true);
     setStageIdx(0);
 
-    // 在状态更新后立即调用API
-    setTimeout(() => {
-      console.log('【调试】开始调用立论阶段API');
-      // 立论阶段应该调用索引0的辩手（一辩）
-      const tempAllowedDebaterIdx = [0]; // 正方一辩
-      const tempAllowedOpponentIdx = [0]; // 反方一辩
+    // 只有在非重置状态下才自动调用API
+    if (!isReset) {
+      // 在状态更新后立即调用API
+      setTimeout(() => {
+        console.log('【调试】开始调用立论阶段API');
+        // 立论阶段应该调用索引0的辩手（一辩）
+        const tempAllowedDebaterIdx = [0]; // 正方一辩
+        const tempAllowedOpponentIdx = [0]; // 反方一辩
 
-      console.log('【调试】立论阶段 - 允许发言辩手:', tempAllowedDebaterIdx);
-      console.log('【调试】立论阶段 - 允许发言反方:', tempAllowedOpponentIdx);
+        console.log('【调试】立论阶段 - 允许发言辩手:', tempAllowedDebaterIdx);
+        console.log('【调试】立论阶段 - 允许发言反方:', tempAllowedOpponentIdx);
 
-      // 手动调用API
-      (async () => {
-        for (const idx of tempAllowedDebaterIdx) {
-          console.log('【调试】手动调用正方一辩:', idx);
-          await handleDebaterSpeak(idx);
-          await delay(100);
-        }
-        for (const idx of tempAllowedOpponentIdx) {
-          console.log('【调试】手动调用反方一辩:', idx);
-          await handleOpponentSpeak(idx);
-          await delay(100);
-        }
-      })();
-    }, 500);
+        // 手动调用API
+        (async () => {
+          for (const idx of tempAllowedDebaterIdx) {
+            console.log('【调试】手动调用正方一辩:', idx);
+            await handleDebaterSpeak(idx);
+            await delay(100);
+          }
+          for (const idx of tempAllowedOpponentIdx) {
+            console.log('【调试】手动调用反方一辩:', idx);
+            await handleOpponentSpeak(idx);
+            await delay(100);
+          }
+        })();
+      }, 500);
+    } else {
+      // 重置后，清除重置标志
+      setIsReset(false);
+    }
   };
 
   return (
@@ -532,6 +649,7 @@ function App() {
                   }
                   stage={stages[stageIdx]}
                   stageIdx={stageIdx}
+                  isReset={isReset}
                 />
               );
             })()}
@@ -553,6 +671,7 @@ function App() {
                   }
                   stage={stages[stageIdx]}
                   stageIdx={stageIdx}
+                  isReset={isReset}
                 />
               );
             })()}
@@ -565,6 +684,7 @@ function App() {
               disabled={isAutoRunning || stageIdx >= stages.length - 1}
               isAutoRunning={isAutoRunning}
               stage={stages[stageIdx]}
+              isReset={isReset}
             />
           </div>
           {/* 只在最后一个阶段显示评分区 */}
