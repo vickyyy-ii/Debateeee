@@ -61,7 +61,7 @@ const debaterModelMap = {
 
 // 辩手发言API（按姓名分配模型）
 app.post('/api/debate/speak', async (req, res) => {
-    let { debater, stage, side } = req.body;
+    let { debater, stage, side, opponentFirstSpeech } = req.body;
     // 如果是陈伟，强制为反方，并在prompt前加特殊要求
     let chenweiPrefix = '';
     if (debater.replace(/（.*?）/, '') === '陈伟') {
@@ -74,12 +74,13 @@ app.post('/api/debate/speak', async (req, res) => {
     if (stage === '立论') {
         prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请阐述立场，定义核心概念，说明判断标准，提出3个论点并总结。每个论点需有真实数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
     } else if (stage === '驳论') {
-        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请回应本方+反驳对方，补充论据，逻辑清晰。每条需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
-    } else if (stage === '质辩提问') {
-        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请提出1个具体问题，暴露对方漏洞，不能泛泛而谈。问题需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
-    } else if (stage === '质辩答复') {
-        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请针对性回答问题，引用真实数据，强化立场，不能回避。每条需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
-    } else if (stage === '质辩小结') {
+        // 驳论环节包含对方一辩的发言内容
+        let opponentContext = '';
+        if (opponentFirstSpeech && opponentFirstSpeech.trim()) {
+            opponentContext = `\n\n对方一辩的发言内容：\n${opponentFirstSpeech}\n\n请针对上述对方一辩的具体观点进行反驳，指出其逻辑漏洞、数据问题或论证缺陷。`;
+        }
+        prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。${opponentContext}请回应本方+反驳对方，补充论据，逻辑清晰。每条需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
+    } else if (stage === '质辩') {
         prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请总结我方优势和对方漏洞，为后续阶段铺垫。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;
     } else if (stage === '自由辩论') {
         prompt = `${topicPrefix}${chenweiPrefix}你是${fullIdentity}，现在是${stage}阶段。请加强论点，攻击对方漏洞，提出引导性问题。需有数据/案例/学术研究支撑，注明来源，总字数不超过300字。禁止编造内容、不得抄袭。`;

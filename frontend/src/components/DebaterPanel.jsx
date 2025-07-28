@@ -58,7 +58,12 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx }) => {
         }
     }
     const shortArgument = argument.length > 60 ? argument.slice(0, 60) + '...' : argument;
-    const isThirdDebate = stage === '质辩' && stageIdx === 2 && !canSpeakIdx.includes(idx);
+    // 判断质辩阶段且不在可发言名单
+    const isDebateStage = stage === '质辩' && !canSpeakIdx.includes(idx);
+    // 判断驳论阶段且不在可发言名单（驳论环节显示所有辩手，但只有二辩发言）
+    const isRebuttalStage = stage === '驳论' && !canSpeakIdx.includes(idx);
+    // 判断质辩阶段且不是三辩（质辩环节只显示三辩的结论）
+    const isNotThirdDebater = stage === '质辩' && idx !== 2;
     // 新增：判断是否正在发言
     const isTyping = latestContent === '（正在调用大模型...）';
     return (
@@ -83,8 +88,12 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx }) => {
             headStyle={{ background: '#f5f7fa', borderRadius: '12px 12px 0 0' }}
         >
             <div>
-                {isThirdDebate ? (
+                {isDebateStage ? (
                     <div style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>无发言</div>
+                ) : isNotThirdDebater ? (
+                    <div style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>等待三辩总结</div>
+                ) : isRebuttalStage ? (
+                    <div style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>等待二辩反驳</div>
                 ) : isTyping ? (
                     <div style={{ color: '#faad14', fontStyle: 'italic', padding: '8px 18px' }}>正在生成<TypingDots /></div>
                 ) : isEmpty ? (

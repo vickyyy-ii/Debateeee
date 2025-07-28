@@ -26,7 +26,7 @@ const stages = ['立论', '驳论', '质辩', '自由辩论', '结辩'];
 const stageSpeakerMap = {
   '立论': { debaters: [0], opponents: [0] }, // 一辩
   '驳论': { debaters: [1], opponents: [1] }, // 二辩
-  '质辩': { debaters: [0, 1, 2, 3], opponents: [0, 1, 2, 3] }, // 全员可提问，三辩小结
+  '质辩': { debaters: [2], opponents: [2] }, // 三辩小结
   '自由辩论': { debaters: [0, 1, 2, 3], opponents: [0, 1, 2, 3] }, // 全员
   '结辩': { debaters: [3], opponents: [3] }, // 四辩
 };
@@ -82,6 +82,17 @@ function App() {
     const stage = stages[stageIdx];
     let content = '（正在调用大模型...）';
     setDebaters(ds => ds.map((d, i) => i === idx ? { ...d, history: [...d.history, content] } : d));
+
+    // 获取一辩的发言内容用于驳论
+    let opponentFirstSpeech = '';
+    if (stage === '驳论') {
+      // 获取对方一辩的发言内容
+      const opponentFirstDebater = opponents[0]; // 反方一辩
+      if (opponentFirstDebater && opponentFirstDebater.history && opponentFirstDebater.history.length > 0) {
+        opponentFirstSpeech = opponentFirstDebater.history[opponentFirstDebater.history.length - 1];
+      }
+    }
+
     try {
       const url = `${import.meta.env.VITE_API_URL}/api/debate/speak`;
       console.log('[API 调用地址]', url);
@@ -89,7 +100,11 @@ function App() {
       const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ debater, stage })
+        body: JSON.stringify({
+          debater,
+          stage,
+          opponentFirstSpeech: stage === '驳论' ? opponentFirstSpeech : undefined
+        })
       }, timeout);
       const data = await res.json();
       console.log('【调试】handleDebaterSpeak fetch返回：', data);
@@ -120,6 +135,17 @@ function App() {
     const stage = stages[stageIdx];
     let content = '（正在调用大模型...）';
     setOpponents(os => os.map((o, i) => i === idx ? { ...o, history: [...o.history, content] } : o));
+
+    // 获取一辩的发言内容用于驳论
+    let opponentFirstSpeech = '';
+    if (stage === '驳论') {
+      // 获取对方一辩的发言内容
+      const debaterFirstDebater = debaters[0]; // 正方一辩
+      if (debaterFirstDebater && debaterFirstDebater.history && debaterFirstDebater.history.length > 0) {
+        opponentFirstSpeech = debaterFirstDebater.history[debaterFirstDebater.history.length - 1];
+      }
+    }
+
     try {
       const url = `${import.meta.env.VITE_API_URL}/api/debate/speak`;
       console.log('[API 调用地址]', url);
@@ -127,7 +153,11 @@ function App() {
       const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ debater, stage })
+        body: JSON.stringify({
+          debater,
+          stage,
+          opponentFirstSpeech: stage === '驳论' ? opponentFirstSpeech : undefined
+        })
       }, timeout);
       const data = await res.json();
       console.log('【调试】handleOpponentSpeak fetch返回：', data);
@@ -227,9 +257,9 @@ function App() {
     setIsAutoRunning(false);
     if (autoTimer.current) clearTimeout(autoTimer.current);
 
-    // 先清空所有辩手的发言历史
-    setDebaters(ds => ds.map(d => ({ ...d, history: [] })));
-    setOpponents(os => os.map(o => ({ ...o, history: [] })));
+    // 不清空发言历史，让后续环节能看到前面的发言内容
+    // setDebaters(ds => ds.map(d => ({ ...d, history: [] })));
+    // setOpponents(os => os.map(o => ({ ...o, history: [] })));
 
     setStageIdx(prev => {
       const next = prev + 1;
@@ -258,11 +288,20 @@ function App() {
 
   // 显示当前阶段允许发言的辩手，保留他们的完整发言历史
   const getCurrentTwoDebaters = (allDebaters, allowedIdx) =>
-    allDebaters.map((d, i) =>
-      allowedIdx.includes(i)
+    allDebaters.map((d, i) => {
+      // 在驳论环节，显示所有辩手的发言历史，让二辩能看到一辩的发言进行反驳
+      if (stages[stageIdx] === '驳论') {
+        return { ...d }; // 保留所有辩手的发言历史
+      }
+      // 在质辩环节，只显示三辩的发言（质辩结论）
+      if (stages[stageIdx] === '质辩') {
+        return i === 2 ? { ...d } : { ...d, history: [] }; // 只显示三辩（索引2）
+      }
+      // 其他环节只显示当前阶段发言的辩手
+      return allowedIdx.includes(i)
         ? { ...d } // 保留完整发言历史
-        : { ...d, history: [] } // 不显示其他辩手的发言
-    );
+        : { ...d, history: [] }; // 不显示其他辩手的发言
+    });
 
   // 裁判自动打分：结辩阶段自动调用大模型接口获取分数
   const handleAutoJudge = async () => {
@@ -379,8 +418,30 @@ function App() {
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <DebaterPanel side="正方" debaters={getCurrentTwoDebaters(debaters, allowedDebaterIdx)} canSpeakIdx={allowedDebaterIdx} visibleIdx={allowedDebaterIdx} stage={stages[stageIdx]} stageIdx={stageIdx} />
-            <DebaterPanel side="反方" debaters={getCurrentTwoDebaters(opponents, allowedOpponentIdx)} canSpeakIdx={allowedOpponentIdx} visibleIdx={allowedOpponentIdx} stage={stages[stageIdx]} stageIdx={stageIdx} />
+            <DebaterPanel
+              side="正方"
+              debaters={getCurrentTwoDebaters(debaters, allowedDebaterIdx)}
+              canSpeakIdx={allowedDebaterIdx}
+              visibleIdx={
+                stages[stageIdx] === '驳论' ? [0, 1, 2, 3] :
+                  stages[stageIdx] === '质辩' ? [2] :
+                    allowedDebaterIdx
+              }
+              stage={stages[stageIdx]}
+              stageIdx={stageIdx}
+            />
+            <DebaterPanel
+              side="反方"
+              debaters={getCurrentTwoDebaters(opponents, allowedOpponentIdx)}
+              canSpeakIdx={allowedOpponentIdx}
+              visibleIdx={
+                stages[stageIdx] === '驳论' ? [0, 1, 2, 3] :
+                  stages[stageIdx] === '质辩' ? [2] :
+                    allowedOpponentIdx
+              }
+              stage={stages[stageIdx]}
+              stageIdx={stageIdx}
+            />
           </div>
           <ControlPanel
             onNextStage={handleNextStage}
