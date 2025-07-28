@@ -83,7 +83,7 @@ function App() {
     let content = '（正在调用大模型...）';
     setDebaters(ds => ds.map((d, i) => i === idx ? { ...d, history: [...d.history, content] } : d));
 
-    // 获取一辩的发言内容用于驳论
+    // 获取一辩的发言内容用于驳论（现在驳论环节只显示二辩，不需要获取一辩内容）
     let opponentFirstSpeech = '';
     if (stage === '驳论') {
       // 获取对方一辩的发言内容
@@ -136,7 +136,7 @@ function App() {
     let content = '（正在调用大模型...）';
     setOpponents(os => os.map((o, i) => i === idx ? { ...o, history: [...o.history, content] } : o));
 
-    // 获取一辩的发言内容用于驳论
+    // 获取一辩的发言内容用于驳论（现在驳论环节只显示二辩，不需要获取一辩内容）
     let opponentFirstSpeech = '';
     if (stage === '驳论') {
       // 获取对方一辩的发言内容
@@ -289,9 +289,9 @@ function App() {
   // 显示当前阶段允许发言的辩手，保留他们的完整发言历史
   const getCurrentTwoDebaters = (allDebaters, allowedIdx) =>
     allDebaters.map((d, i) => {
-      // 在驳论环节，显示所有辩手的发言历史，让二辩能看到一辩的发言进行反驳
+      // 在驳论环节，只显示二辩的发言
       if (stages[stageIdx] === '驳论') {
-        return { ...d }; // 保留所有辩手的发言历史
+        return i === 1 ? { ...d } : { ...d, history: [] }; // 只显示二辩（索引1）
       }
       // 在质辩环节，只显示三辩的发言（质辩结论）
       if (stages[stageIdx] === '质辩') {
@@ -423,7 +423,7 @@ function App() {
               debaters={getCurrentTwoDebaters(debaters, allowedDebaterIdx)}
               canSpeakIdx={allowedDebaterIdx}
               visibleIdx={
-                stages[stageIdx] === '驳论' ? [0, 1, 2, 3] :
+                stages[stageIdx] === '驳论' ? [1] :
                   stages[stageIdx] === '质辩' ? [2] :
                     allowedDebaterIdx
               }
@@ -435,7 +435,7 @@ function App() {
               debaters={getCurrentTwoDebaters(opponents, allowedOpponentIdx)}
               canSpeakIdx={allowedOpponentIdx}
               visibleIdx={
-                stages[stageIdx] === '驳论' ? [0, 1, 2, 3] :
+                stages[stageIdx] === '驳论' ? [1] :
                   stages[stageIdx] === '质辩' ? [2] :
                     allowedOpponentIdx
               }

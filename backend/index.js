@@ -36,7 +36,7 @@ const deepseek = new OpenAI({
 });
 const hunyuan = new OpenAI({
     baseURL: 'https://api.hunyuan.cloud.tencent.com/v1',
-    apiKey: 'sk-ul8ixprFBfZQ0w7tCEB9PC7G84C6Bz09ogxXUWCbiibqtVZL'
+    apiKey: 'sk-VV37Ug8FruMs9fIUkczAwo8Pd2h05bEMj91pcwgOBe71VF0T'
 });
 const qwen = new OpenAI({
     baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
