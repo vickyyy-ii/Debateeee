@@ -109,7 +109,11 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx }) => {
                         {avatarMap[debater.realName] || debater.realName[0]}
                     </Avatar>
                     {debater.name}（{debater.realName}） <span style={{ color: '#1677ff' }}>{debater.model}</span>
-                    {isTyping && <span style={{ color: '#faad14', marginLeft: 8 }}>正在发言<TypingDots /></span>}
+                    {isTyping && (
+                        <TypewriterText style={{ color: '#faad14', marginLeft: 8, display: 'inline' }}>
+                            正在发言<TypingDots />
+                        </TypewriterText>
+                    )}
                 </span>
             }
             style={{
@@ -126,25 +130,31 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx }) => {
         >
             <div>
                 {isDebateStage ? (
-                    <div style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>无发言</div>
+                    <TypewriterText style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>
+                        无发言
+                    </TypewriterText>
                 ) : isNotSecondDebater ? (
-                    <div style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>
+                    <TypewriterText style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>
                         等待二辩反驳<TypingDots />
-                    </div>
+                    </TypewriterText>
                 ) : isNotThirdDebater ? (
-                    <div style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>
+                    <TypewriterText style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>
                         等待三辩总结<TypingDots />
-                    </div>
+                    </TypewriterText>
                 ) : isSecondDebaterInRebuttal ? (
-                    <div style={{ color: '#faad14', fontStyle: 'italic', padding: '8px 18px' }}>
+                    <TypewriterText style={{ color: '#faad14', fontStyle: 'italic', padding: '8px 18px' }}>
                         准备反驳<TypingDots />
-                    </div>
+                    </TypewriterText>
                 ) : isTyping ? (
-                    <div style={{ color: '#faad14', fontStyle: 'italic', padding: '8px 18px' }}>正在生成<TypingDots /></div>
+                    <TypewriterText style={{ color: '#faad14', fontStyle: 'italic', padding: '8px 18px' }}>
+                        正在生成<TypingDots />
+                    </TypewriterText>
                 ) : isEmpty ? (
-                    <div style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>等待中…<TypingDots /></div>
+                    <TypewriterText style={{ color: '#aaa', fontStyle: 'italic', padding: '8px 18px' }}>
+                        等待中…<TypingDots />
+                    </TypewriterText>
                 ) : (
-                    <FadeInText
+                    <TypewriterText
                         key={latestContent}
                         style={{
                             background: isError ? '#fff1f0' : '#f6f8fa',
@@ -165,30 +175,82 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx }) => {
                         }}
                     >
                         {isError ? (
-                            '⚠️ 大模型接口调用失败，请重试！'
+                            <TypewriterText>
+                                ⚠️ 大模型接口调用失败，请重试！
+                            </TypewriterText>
                         ) : (
                             <>
                                 <span style={{ fontWeight: 'bold' }}>
                                     {expanded ? argument : shortArgument}
                                 </span>
                                 {argument.length > 60 && (
-                                    <span
+                                    <TypewriterText
                                         style={{ color: '#1677ff', cursor: 'pointer', marginLeft: 8 }}
                                         onClick={() => setExpanded(e => !e)}
                                     >
                                         {expanded ? '收起' : '展开'}
-                                    </span>
+                                    </TypewriterText>
                                 )}
                             </>
                         )}
-                    </FadeInText>
+                    </TypewriterText>
                 )}
             </div>
         </Card>
     );
 };
 
-// 渐出动画组件
+// 逐字显示动画组件
+const TypewriterText = ({ children, style }) => {
+    const [displayText, setDisplayText] = useState('');
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isTyping, setIsTyping] = useState(false);
+
+    useEffect(() => {
+        if (!children) return;
+
+        setIsTyping(true);
+        setDisplayText('');
+        setCurrentIndex(0);
+
+        // 将React元素转换为纯文本
+        const getTextContent = (element) => {
+            if (typeof element === 'string') return element;
+            if (typeof element === 'number') return element.toString();
+            if (Array.isArray(element)) return element.map(getTextContent).join('');
+            if (element && typeof element === 'object' && element.props) {
+                return getTextContent(element.props.children);
+            }
+            return '';
+        };
+
+        const text = getTextContent(children);
+        const interval = setInterval(() => {
+            if (currentIndex < text.length) {
+                setDisplayText(prev => prev + text[currentIndex]);
+                setCurrentIndex(prev => prev + 1);
+            } else {
+                setIsTyping(false);
+                clearInterval(interval);
+            }
+        }, 25); // 每25毫秒显示一个字，稍微快一点
+
+        return () => clearInterval(interval);
+    }, [children, currentIndex]);
+
+    return (
+        <span style={style}>
+            {displayText}
+            {isTyping && <span style={{
+                animation: 'blink 1s infinite',
+                color: '#1677ff',
+                fontWeight: 'bold'
+            }}>|</span>}
+        </span>
+    );
+};
+
+// 渐出动画组件（保留用于其他用途）
 const FadeInText = ({ children, style }) => {
     const [visible, setVisible] = useState(false);
     const ref = useRef();
