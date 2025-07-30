@@ -270,15 +270,23 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx, isReset = fal
         <Card
             title={
                 <span style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Avatar style={{ background: '#e6f4ff', fontSize: 22 }} size={40}>
+                    <div className="debater-avatar">
                         {avatarMap[debater.realName] || debater.realName[0]}
-                    </Avatar>
-                    {debater.name}（{debater.realName}） <span style={{ color: '#1677ff' }}>{debater.model}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '1rem', fontWeight: '700', color: '#2d3748' }}>
+                            {debater.name}（{debater.realName}）
+                        </span>
+                        <span style={{ fontSize: '0.8rem', color: '#667eea', fontWeight: '600' }}>
+                            {debater.model}
+                        </span>
+                    </div>
                     {isTyping && (
                         <span
                             key={`speaking-${debater.realName}`}
-                            style={{ color: '#faad14', marginLeft: 8, display: 'inline' }}
+                            style={{ color: '#f59e0b', marginLeft: 8, display: 'inline', fontSize: '0.9rem' }}
                         >
+                            <span className="status-indicator speaking"></span>
                             正在发言<TypingDots />
                         </span>
                     )}
@@ -286,14 +294,20 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx, isReset = fal
             }
             style={{
                 marginBottom: 16,
-                borderRadius: 12,
-                boxShadow: '0 2px 8px #f0f1f2',
-                border: undefined,
-                background: '#fafdff',
-                transition: 'box-shadow 0.3s, border 0.3s'
+                borderRadius: 16,
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                background: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                transition: 'all 0.3s ease'
             }}
             styles={{
-                header: { background: '#f5f7fa', borderRadius: '12px 12px 0 0' }
+                header: { 
+                    background: 'rgba(255, 255, 255, 0.15)', 
+                    borderRadius: '16px 16px 0 0',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+                }
             }}
         >
             <div>
@@ -361,22 +375,22 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx, isReset = fal
                         <div
                             className="debate-text-container"
                             style={{
-                                background: isError ? '#fff1f0' : '#f6f8fa',
-                                borderRadius: 8,
-                                padding: '8px 18px',
-                                boxShadow: '0 1px 3px #eee',
+                                background: isError ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                                borderRadius: 12,
+                                padding: '12px 16px',
+                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
                                 alignSelf: 'flex-start',
                                 maxWidth: '98%',
                                 minWidth: 180,
-                                maxHeight: '200px', // 设置最大高度
-                                overflowY: 'auto', // 添加垂直滚动
+                                maxHeight: '200px',
+                                overflowY: 'auto',
                                 wordBreak: 'break-word',
                                 whiteSpace: 'pre-wrap',
-                                fontSize: 16,
+                                fontSize: '0.95rem',
                                 lineHeight: 1.6,
-                                color: isError ? '#cf1322' : undefined,
-                                scrollbarWidth: 'thin', // 细滚动条
-                                scrollbarColor: '#d9d9d9 #f5f5f5' // 滚动条颜色
+                                color: isError ? '#ef4444' : '#2d3748',
+                                border: isError ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                transition: 'all 0.3s ease'
                             }}
                         >
                             {isError ? (
@@ -408,18 +422,28 @@ const DebaterCard = ({ debater, idx, canSpeakIdx, stage, stageIdx, isReset = fal
                                             }}
                                             style={{
                                                 marginTop: '8px',
-                                                padding: '4px 8px',
-                                                fontSize: '12px',
-                                                background: '#1677ff',
+                                                padding: '6px 12px',
+                                                fontSize: '0.8rem',
+                                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                                                 color: 'white',
                                                 border: 'none',
-                                                borderRadius: '4px',
+                                                borderRadius: '8px',
                                                 cursor: 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '4px'
+                                                gap: '4px',
+                                                transition: 'all 0.3s ease',
+                                                boxShadow: '0 2px 8px rgba(102, 126, 234, 0.2)'
                                             }}
                                             title="朗读发言内容"
+                                            onMouseOver={e => {
+                                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)';
+                                            }}
+                                            onMouseOut={e => {
+                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.2)';
+                                            }}
                                         >
                                             🔊 朗读
                                         </button>

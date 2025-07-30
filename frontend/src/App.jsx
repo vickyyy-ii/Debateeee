@@ -662,33 +662,11 @@ function App() {
   };
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, minHeight: '100vh' }}>
+    <div className="debate-container fade-in">
       {!isStarted ? (
         <div style={{ textAlign: 'center', marginTop: 100 }}>
           <button
-            style={{
-              fontSize: 24,
-              padding: '16px 34px',
-              borderRadius: 32,
-              background: 'linear-gradient(90deg, #1677ff 0%, #49c6fa 100%)',
-              color: '#fff',
-              border: 'none',
-              boxShadow: '0 4px 16px rgba(22,119,255,0.15)',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              letterSpacing: 2,
-              transition: 'background 0.3s, box-shadow 0.3s, transform 0.2s',
-            }}
-            onMouseOver={e => {
-              e.currentTarget.style.background = 'linear-gradient(90deg, #49c6fa 0%, #1677ff 100%)';
-              e.currentTarget.style.transform = 'scale(1.04)';
-              e.currentTarget.style.boxShadow = '0 8px 24px rgba(22,119,255,0.22)';
-            }}
-            onMouseOut={e => {
-              e.currentTarget.style.background = 'linear-gradient(90deg, #1677ff 0%, #49c6fa 100%)';
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = '0 4px 16px rgba(22,119,255,0.15)';
-            }}
+            className="start-button"
             onClick={handleStartDebate}
           >
             开始辩论
@@ -696,45 +674,54 @@ function App() {
         </div>
       ) : (
         <>
-          <DebateStage topic="社交媒体利大于弊还是弊大于利" stage={stages[stageIdx]} />
-          <StageProgress stages={stages} currentIdx={stageIdx} />
+          <div className="debate-stage slide-in">
+            <DebateStage topic="社交媒体利大于弊还是弊大于利" stage={stages[stageIdx]} />
+          </div>
+          <div className="progress-container">
+            <StageProgress stages={stages} currentIdx={stageIdx} />
+          </div>
           {showStageTip && (
             <div style={{
               position: 'fixed',
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              background: 'rgba(0, 0, 0, 0.7)',
+              background: 'rgba(0, 0, 0, 0.8)',
               color: 'white',
-              padding: '20px 40px',
-              borderRadius: '8px',
+              padding: '24px 48px',
+              borderRadius: '16px',
               fontSize: '24px',
-              zIndex: 1000
+              zIndex: 1000,
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              boxShadow: '0 16px 48px rgba(0, 0, 0, 0.3)'
             }}>
               {stageTipText}
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', minHeight: '400px' }}>
+          <div className="debate-panels">
             {(() => {
               console.log('【调试】正方DebaterPanel - 当前阶段:', stages[stageIdx]);
               console.log('【调试】正方DebaterPanel - allowedDebaterIdx:', allowedDebaterIdx);
               console.log('【调试】正方DebaterPanel - visibleIdx:', stages[stageIdx] === '驳论' ? [1] : stages[stageIdx] === '质辩' ? [2] : allowedDebaterIdx);
               return (
-                <DebaterPanel
-                  side="正方"
-                  debaters={getCurrentTwoDebaters(debaters, allowedDebaterIdx)}
-                  canSpeakIdx={allowedDebaterIdx}
-                  visibleIdx={
-                    stages[stageIdx] === '驳论' ? [1] :
-                      stages[stageIdx] === '质辩' ? [2] :
-                        allowedDebaterIdx
-                  }
-                  stage={stages[stageIdx]}
-                  stageIdx={stageIdx}
-                  isReset={isReset}
-                  addToReadingQueue={addToReadingQueue}
-                  isReading={isReading}
-                />
+                <div className="debater-panel positive">
+                  <DebaterPanel
+                    side="正方"
+                    debaters={getCurrentTwoDebaters(debaters, allowedDebaterIdx)}
+                    canSpeakIdx={allowedDebaterIdx}
+                    visibleIdx={
+                      stages[stageIdx] === '驳论' ? [1] :
+                        stages[stageIdx] === '质辩' ? [2] :
+                          allowedDebaterIdx
+                    }
+                    stage={stages[stageIdx]}
+                    stageIdx={stageIdx}
+                    isReset={isReset}
+                    addToReadingQueue={addToReadingQueue}
+                    isReading={isReading}
+                  />
+                </div>
               );
             })()}
             {(() => {
@@ -744,25 +731,27 @@ function App() {
               console.log('【调试】反方DebaterPanel - allowedOpponentIdx:', allowedOpponentIdx);
               console.log('【调试】反方DebaterPanel - visibleIdx:', stages[stageIdx] === '驳论' ? [1] : stages[stageIdx] === '质辩' ? [2] : allowedOpponentIdx);
               return (
-                <DebaterPanel
-                  side="反方"
-                  debaters={processedOpponents}
-                  canSpeakIdx={allowedOpponentIdx}
-                  visibleIdx={
-                    stages[stageIdx] === '驳论' ? [1] :
-                      stages[stageIdx] === '质辩' ? [2] :
-                        allowedOpponentIdx
-                  }
-                  stage={stages[stageIdx]}
-                  stageIdx={stageIdx}
-                  isReset={isReset}
-                  addToReadingQueue={addToReadingQueue}
-                  isReading={isReading}
-                />
+                <div className="debater-panel negative">
+                  <DebaterPanel
+                    side="反方"
+                    debaters={processedOpponents}
+                    canSpeakIdx={allowedOpponentIdx}
+                    visibleIdx={
+                      stages[stageIdx] === '驳论' ? [1] :
+                        stages[stageIdx] === '质辩' ? [2] :
+                          allowedOpponentIdx
+                    }
+                    stage={stages[stageIdx]}
+                    stageIdx={stageIdx}
+                    isReset={isReset}
+                    addToReadingQueue={addToReadingQueue}
+                    isReading={isReading}
+                  />
+                </div>
               );
             })()}
           </div>
-          <div style={{ marginTop: '24px', padding: '16px', background: '#f5f7fa', borderRadius: '8px' }}>
+          <div className="control-panel">
             <ControlPanel
               onNextStage={handleNextStage}
               onReset={handleReset}
@@ -776,15 +765,17 @@ function App() {
           {/* 只在最后一个阶段显示评分区 */}
           {stageIdx === stages.length - 1 && (
             <>
-              <JudgePanel
-                debaters={[...debaters, ...opponents]}
-                scores={scores}
-                onScoreChange={handleScoreChange}
-                onAutoJudge={handleAutoJudge}
-              />
+              <div className="judge-panel">
+                <JudgePanel
+                  debaters={[...debaters, ...opponents]}
+                  scores={scores}
+                  onScoreChange={handleScoreChange}
+                  onAutoJudge={handleAutoJudge}
+                />
+              </div>
               <div style={{ textAlign: 'center', marginTop: 24 }}>
-                <button onClick={handleReset} style={{ fontSize: 18, padding: '8px 32px', borderRadius: 8, background: '#f5f7fa', border: '1px solid #d9d9d9', cursor: 'pointer' }}>
-                  重置
+                <button onClick={handleReset} className="control-button secondary">
+                  重置辩论
                 </button>
               </div>
             </>
