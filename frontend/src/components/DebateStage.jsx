@@ -1,15 +1,31 @@
 import React from 'react';
-import { Typography, Divider } from 'antd';
+import { Typography } from 'antd';
+
+const { Title } = Typography;
 
 const DebateStage = ({ topic, stage }) => (
-    <div style={{ marginBottom: 24 }}>
-        <Typography.Title level={2} style={{ textAlign: 'center', fontWeight: 'bold', margin: 0 }}>
+    <div>
+        <Title level={1} style={{ 
+            textAlign: 'center', 
+            fontWeight: '800', 
+            margin: '0 0 1rem 0',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            fontSize: '2.5rem'
+        }}>
             辩题：{topic}
-        </Typography.Title>
-        <Divider style={{ margin: '12px 0' }} />
-        <Typography.Title level={4} style={{ textAlign: 'center', margin: 0 }}>
+        </Title>
+        <Title level={2} style={{ 
+            textAlign: 'center', 
+            margin: '0.5rem 0 0 0',
+            color: '#4a5568',
+            fontWeight: '600',
+            fontSize: '1.5rem'
+        }}>
             当前阶段：{stage}
-        </Typography.Title>
+        </Title>
     </div>
 );
 
